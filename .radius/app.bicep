@@ -19,7 +19,7 @@ resource mysqlDb 'Radius.Data/mySqlDatabases@2025-08-01-preview' = {
     environment: environment
     application: app.id
     database: 'todos'
-    version: '9.3'
+    version: '8.4'
     username: 'root'
     password: password
   }
