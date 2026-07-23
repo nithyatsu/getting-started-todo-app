@@ -20,7 +20,7 @@ resource mysqlDb 'Radius.Data/mySqlDatabases@2025-08-01-preview' = {
     application: app.id
     database: 'todos'
     version: '8.4'
-    username: 'root'
+    username: 'radiusadmin'
     password: password
   }
 }
@@ -55,7 +55,7 @@ resource todoContainer 'Radius.Compute/containers@2025-08-01-preview' = {
             value: mysqlDb.properties.host
           }
           MYSQL_USER: {
-            value: 'root'
+            value: 'radiusadmin'
           }
           MYSQL_PASSWORD: {
             value: password
