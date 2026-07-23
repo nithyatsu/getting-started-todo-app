@@ -255,25 +255,6 @@ jobs:
             --parameters containerImagesRegistrySecretName="$REGISTRY_SECRET_NAME"
           echo "✅ Environment '$ENVIRONMENT' created with recipe pack."
 
-      - name: Provision registry secret on target cluster
-        if: ${{ vars.AZURE_AKS_CLUSTER_NAME != '' }}
-        run: |
-          REGISTRY_SECRET_NAME="ghcr-registry-creds"
-          NAMESPACE="${{ vars.KUBERNETES_NAMESPACE || 'default' }}"
-          BICEP_APP_NAME=$(grep -oP "name:\s*'\K[^']+" ".radius/app.bicep" 2>/dev/null | head -1)
-          [ -z "$BICEP_APP_NAME" ] && BICEP_APP_NAME="app"
-          APP_NS="default-$BICEP_APP_NAME"
-          for NS in "$NAMESPACE" "$APP_NS"; do
-            kubectl --kubeconfig "$RADIUS_TARGET_KUBECONFIG" get namespace "$NS" >/dev/null 2>&1 || \
-              kubectl --kubeconfig "$RADIUS_TARGET_KUBECONFIG" create namespace "$NS"
-            kubectl --kubeconfig "$RADIUS_TARGET_KUBECONFIG" create secret generic "$REGISTRY_SECRET_NAME" \
-              --namespace "$NS" \
-              --from-literal=username="${{ github.actor }}" \
-              --from-literal=password="${{ secrets.GITHUB_TOKEN }}" \
-              --dry-run=client -o yaml | kubectl --kubeconfig "$RADIUS_TARGET_KUBECONFIG" apply -f -
-            echo "Provisioned $REGISTRY_SECRET_NAME on target cluster in namespace $NS"
-          done
-
       - name: Run rad commands
         uses: radius-project/radius/.github/extension/actions/run-rad-commands@main
         with:
