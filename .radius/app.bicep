@@ -14,7 +14,7 @@ resource app 'Radius.Core/applications@2025-08-01-preview' = {
 }
 
 resource mysqlDb 'Radius.Data/mySqlDatabases@2025-08-01-preview' = {
-  name: 'todo-app-mysql'
+  name: 'nithyatsu-todo-mysql'
   properties: {
     environment: environment
     application: app.id
