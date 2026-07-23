@@ -20,6 +20,7 @@ resource mysqlDb 'Radius.Data/mySqlDatabases@2025-08-01-preview' = {
     database: 'todos'
     username: 'root'
     password: password
+    version: '8.0.21'
   }
 }
 

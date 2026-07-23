@@ -203,6 +203,11 @@ jobs:
           echo "✅ Cloud credentials registered with Radius."
 
       - name: Create Radius environment and recipe pack
+        env:
+          # Used by the recipe-pack patch below. Defined here so the strings
+          # with embedded quotes don't need complex shell escaping.
+          MYSQL_VERSION_TERNARY: "version: '{{context.resource.properties.version == \"5.7\" ? \"5.7\" : \"8.0.21\"}}'"
+          MYSQL_VERSION_PROP: "version: '{{context.resource.properties.version}}'"
         run: |
           NAMESPACE="${{ vars.KUBERNETES_NAMESPACE || 'default' }}"
 
@@ -234,6 +239,13 @@ jobs:
           ENV_BICEP="$APP_DIR/radius-env.bicep"
           curl -fsSL "$RECIPE_PACK_URL" -o "$ENV_BICEP"
 
+          # Patch: Radius does not evaluate ternary expressions (condition ? a : b)
+          # in {{...}} recipe parameters. Replace the MySQL version ternary with a
+          # direct property reference so Radius can resolve it. The app.bicep MySQL
+          # resource explicitly sets version: '8.0.21', so this evaluates correctly.
+          # OLD_PAT/NEW_PAT are passed via env to avoid shell-escaping complexity.
+          python3 -c "import sys,os;p=sys.argv[1];s=open(p).read();old=os.environ['MYSQL_VERSION_TERNARY'];new=os.environ['MYSQL_VERSION_PROP'];found=old in s;open(p,'w').write(s.replace(old,new)) if found else None;print('Patched MySQL version ternary.' if found else 'MySQL version ternary not found; skipping.')" "$ENV_BICEP"
+
           # routesGatewayName is a required pack parameter, but it only matters when
           # a Radius.Compute/routes resource is actually deployed. Default to empty
           # unless the repo configures an existing Kubernetes Gateway.
@@ -255,6 +267,35 @@ jobs:
             --parameters containerImagesRegistrySecretName="$REGISTRY_SECRET_NAME"
           echo "✅ Environment '$ENVIRONMENT' created with recipe pack."
 
+      - name: Provision registry credentials on target cluster
+        # The Radius.Compute/containerImages recipe reads the registry Secret via
+        # the Kubernetes provider. When RADIUS_TARGET_KUBECONFIG is set (AKS),
+        # bicep-de routes all Kubernetes extension operations to the target cluster,
+        # so the secret must exist there — not only on the control plane.
+        # Materialize it in both the environment namespace and the application
+        # namespace (mirroring what run-rad-commands does on the control plane).
+        if: ${{ vars.AZURE_AKS_CLUSTER_NAME != '' }}
+        env:
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NAMESPACE="${{ vars.KUBERNETES_NAMESPACE || 'default' }}"
+          BICEP_APP_NAME=$(grep -oP "name:\s*'\K[^']+" ".radius/app.bicep" 2>/dev/null | head -1)
+          [ -z "$BICEP_APP_NAME" ] && BICEP_APP_NAME="app"
+          APP_NS="default-$BICEP_APP_NAME"
+          REGISTRY_SECRET_NAME="ghcr-registry-creds"
+
+          for NS in "$NAMESPACE" "$APP_NS"; do
+            kubectl --kubeconfig "$RADIUS_TARGET_KUBECONFIG" get namespace "$NS" >/dev/null 2>&1 || \
+              kubectl --kubeconfig "$RADIUS_TARGET_KUBECONFIG" create namespace "$NS"
+            kubectl --kubeconfig "$RADIUS_TARGET_KUBECONFIG" create secret generic "$REGISTRY_SECRET_NAME" \
+              --namespace "$NS" \
+              --from-literal=username="$REGISTRY_USERNAME" \
+              --from-literal=password="$REGISTRY_PASSWORD" \
+              --dry-run=client -o yaml | kubectl --kubeconfig "$RADIUS_TARGET_KUBECONFIG" apply -f -
+            echo "Provisioned $REGISTRY_SECRET_NAME in target cluster namespace $NS"
+          done
+
       - name: Run rad commands
         uses: radius-project/radius/.github/extension/actions/run-rad-commands@main
         with:
@@ -270,3 +311,4 @@ jobs:
       - name: Teardown
         if: always()
         uses: radius-project/radius/.github/extension/actions/teardown@main
+
