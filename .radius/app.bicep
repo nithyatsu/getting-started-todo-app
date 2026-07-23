@@ -1,6 +1,7 @@
 extension radius
 
 param environment string
+param image string = ''
 
 @secure()
 param password string
@@ -13,12 +14,13 @@ resource app 'Radius.Core/applications@2025-08-01-preview' = {
 }
 
 resource mysqlDb 'Radius.Data/mySqlDatabases@2025-08-01-preview' = {
-  name: 'mysql'
+  name: 'nithyatsu-todo-mysql'
   properties: {
     environment: environment
     application: app.id
     database: 'todos'
-    username: 'root'
+    version: '8.4'
+    username: 'radiusadmin'
     password: password
   }
 }
@@ -53,7 +55,7 @@ resource todoContainer 'Radius.Compute/containers@2025-08-01-preview' = {
             value: mysqlDb.properties.host
           }
           MYSQL_USER: {
-            value: 'root'
+            value: 'radiusadmin'
           }
           MYSQL_PASSWORD: {
             value: password
