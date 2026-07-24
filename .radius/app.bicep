@@ -22,6 +22,7 @@ resource mysqlDb 'Radius.Data/mySqlDatabases@2025-08-01-preview' = {
     version: '8.4'
     username: 'radiusadmin'
     password: password
+    version: '8.0.21'
   }
 }
 
