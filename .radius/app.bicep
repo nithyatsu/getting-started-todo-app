@@ -2,6 +2,9 @@ extension radius
 
 param environment string
 param image string = ''
+param registryUsername string = ''
+@secure()
+param registryPassword string = ''
 
 @secure()
 param password string
